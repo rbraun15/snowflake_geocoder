@@ -41,7 +41,6 @@ CREATE OR REPLACE NETWORK RULE here_geocode_network_rule
 ------------------------------------------------------------------------------------------------
 CREATE OR REPLACE SECRET here_api_key_secret
 TYPE = GENERIC_STRING 
-SECRET_STRING = 'SaGe3OzkYWu3xkTiSIw2z7NhgEW0wPh5g_g7cXBRIIk';  -- Replace with your actual HERE API key
 --SECRET_STRING = 'YOUR_API_KEY_HERE';  -- Replace with your actual HERE API key
 
 
