@@ -93,6 +93,7 @@ CREATE OR REPLACE TABLE Source_Addresses (
     Name VARCHAR(255),
     Department VARCHAR(100),
     Address_ID INTEGER AUTOINCREMENT,
+    Address_Source_ID VARCHAR(100),
     Address VARCHAR(500),
     GeoCoded VARCHAR(3) DEFAULT 'No'
 );
@@ -106,6 +107,7 @@ CREATE OR REPLACE TABLE Geocoded_Addresses (
     Name VARCHAR(255),
     Department VARCHAR(100),
     Address_ID INTEGER,
+    Address_Source_ID VARCHAR(100),
     Address VARCHAR(500),
     Street VARCHAR(255),
     City VARCHAR(100),
@@ -120,18 +122,19 @@ CREATE OR REPLACE TABLE Geocoded_Addresses (
 ------------------------------------------------------------------------------------------------
 -- Insert Sample Addresses
 ------------------------------------------------------------------------------------------------
-INSERT INTO Source_Addresses (Name, Department, Address, GeoCoded) VALUES
-    ('Miami Beach Property', 'Sales', '4601 Collins Ave Miami Beach FL 33140', 'No'),
-    ('Rochester Home', 'Marketing', '114 Orland Rd Rochester NY 14622', 'No'),
-    ('Greenville Residence', 'Sales', '103 Autumn Rd Greenville SC 29650', 'No'),
-        ('Clemson1', 'Student', '217 W Main ST Central SC 29630', 'No'),
-        ('Clemson2', 'Student', '119 N Townville St Seneca SC 29678', 'No'),
-        ('Clemson3', 'Student', '356 Clemosn St Clemson SC 29631', 'No')
+INSERT INTO Source_Addresses (Name, Address_Source_ID, Department, Address, GeoCoded) VALUES
+    ('Miami Beach Property', 'A1', 'Sales', '4601 Collins Ave Miami Beach FL 33140', 'No'),
+    ('Rochester Home', 'A2','Marketing', '114 Orland Rd Rochester NY 14622', 'No'),
+    ('Greenville Residence','A3', 'Sales', '103 Autumn Rd Greenville SC 29650', 'No'),
+        ('Clemson1', 'A4', 'Student', '217 W Main ST Central SC 29630', 'No'),
+        ('Clemson2', 'A5', 'Student', '119 N Townville St Seneca SC 29678', 'No'),
+        ('Clemson3', 'A6', 'Student', '356 Clemosn St Clemson SC 29631', 'No')
 ;
 
 
 -- testing rest
 delete from Geocoded_Addresses;
+delete from Source_Addresses;
 update Source_Addresses set GeoCoded = 'No';
 ------------------------------------------------------------------------------------------------
 -- Create Stored Procedure to Process Ungeocoded Addresses
@@ -153,12 +156,13 @@ BEGIN
     WHERE GeoCoded = 'No';
     
     -- Process each ungeocoded address
-    INSERT INTO Geocoded_Addresses (Name, Department, Address_ID, Address, Street, City, State, Zip, Lat, Long)
+    INSERT INTO Geocoded_Addresses (Name, Department, Address_ID, Address_Source_ID, Address, Street, City, State, Zip, Lat, Long)
     WITH addresses_to_process AS (
         SELECT 
             Name,
             Department,
             Address_ID,
+            Address_Source_ID, 
             Address
         FROM Source_Addresses
         WHERE GeoCoded = 'No'
@@ -168,6 +172,7 @@ BEGIN
             a.Name,
             a.Department,
             a.Address_ID,
+            a.Address_Source_ID, 
             a.Address,
             PARSE_JSON(geocode_address(a.Address))::VARIANT AS api_response
         FROM addresses_to_process a
@@ -177,6 +182,7 @@ BEGIN
             g.Name,
             g.Department,
             g.Address_ID,
+            g.Address_Source_ID, 
             g.Address,
             f.value:address.street::STRING AS street,
             f.value:address.city::STRING AS city,
@@ -191,6 +197,7 @@ BEGIN
         Name,
         Department,
         Address_ID,
+        Address_Source_ID, 
         Address,
         street,
         city,
@@ -236,6 +243,7 @@ $$;
 ------------------------------------------------------------------------------------------------
 SELECT 
     Address_ID,
+    Address_Source_ID, 
     Name,
     Department,
     Address,
@@ -257,6 +265,7 @@ CALL Process_Ungeocoded_Addresses();
 ------------------------------------------------------------------------------------------------
 SELECT 
     Address_ID,
+    Address_Source_ID, 
     Name,
     Department,
     Address,
@@ -273,6 +282,7 @@ SELECT
     Name,
     Department,
     Address_ID,
+    Address_Source_ID, 
     Address,
     Street,
     City,
@@ -286,7 +296,7 @@ ORDER BY Address_ID;
 
 
 -- Test some samples
-select 'https://www.google.com/maps?q=' || lat || ',' || long FROM Geocoded_Addresses where GEOCODED_TIMESTAMP is not null;
+select address,  'https://www.google.com/maps?q=' || lat || ',' || long FROM Geocoded_Addresses where GEOCODED_TIMESTAMP is not null limit 5;
 
 
 ------------------------------------------------------------------------------------------------
@@ -294,6 +304,7 @@ select 'https://www.google.com/maps?q=' || lat || ',' || long FROM Geocoded_Addr
 ------------------------------------------------------------------------------------------------
 SELECT 
     s.Address_ID,
+    s.Address_Source_ID, 
     s.Name,
     s.Department,
     s.Address AS Original_Address,
@@ -354,6 +365,7 @@ LATERAL FLATTEN(input => test_geocode.api_response:items) f;
 ------------------------------------------------------------------------------------------------
 SELECT 
     s.Address_ID,
+    s.Address_Source_ID, 
     s.Name,
     s.Department,
     s.Address,
@@ -412,12 +424,13 @@ BEGIN
     );
     
     -- Process batch of ungeocoded addresses
-    INSERT INTO Geocoded_Addresses (Name, Department, Address_ID, Address, Street, City, State, Zip, Lat, Long)
+    INSERT INTO Geocoded_Addresses (Name, Department, Address_ID, Address_Source_ID,  Address, Street, City, State, Zip, Lat, Long)
     WITH addresses_to_process AS (
         SELECT 
             Name,
             Department,
             Address_ID,
+            Address_Source_ID, 
             Address
         FROM Source_Addresses
         WHERE GeoCoded = 'No'
@@ -428,6 +441,7 @@ BEGIN
             a.Name,
             a.Department,
             a.Address_ID,
+            a.Address_Source_ID, 
             a.Address,
             PARSE_JSON(geocode_address(a.Address))::VARIANT AS api_response
         FROM addresses_to_process a
@@ -437,6 +451,7 @@ BEGIN
             g.Name,
             g.Department,
             g.Address_ID,
+            g.Address_Source_ID, 
             g.Address,
             f.value:address.street::STRING AS street,
             f.value:address.city::STRING AS city,
@@ -451,6 +466,7 @@ BEGIN
         Name,
         Department,
         Address_ID,
+        Address_Source_ID, 
         Address,
         street,
         city,
@@ -503,7 +519,7 @@ CREATE OR REPLACE VIEW Geocoding_Analytics_View AS
 SELECT 
     DATE_TRUNC('day', Geocoded_Timestamp) as geocoded_date,
     Department,
-    COUNT(*) as addresses_geocoded,
+    COUNT(*) as addresses_geocoded, 
     COUNT(DISTINCT State) as states_covered,
     COUNT(DISTINCT City) as cities_covered,
     AVG(Lat) as avg_latitude,
@@ -522,6 +538,7 @@ SELECT * FROM Geocoding_Analytics_View;
 CREATE OR REPLACE VIEW Unprocessed_Addresses_View AS
 SELECT 
     s.Address_ID,
+    s.Address_Source_ID, 
     s.Name,
     s.Department,
     s.Address,
@@ -570,6 +587,7 @@ ORDER BY Geocoded_Timestamp DESC;
 -- Get addresses for a specific department that need geocoding
 SELECT 
     Address_ID,
+    Address_Source_ID, 
     Name,
     Address
 FROM Source_Addresses
@@ -674,4 +692,5 @@ DROP NETWORK RULE IF EXISTS here_geocode_network_rule;
 DROP SCHEMA IF EXISTS DEMO_GEOCODE.ADDRESS_PROCESSING;
 DROP DATABASE IF EXISTS DEMO_GEOCODE;
 */
+
 
